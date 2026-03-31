@@ -12,12 +12,13 @@ import logging
 from pathlib import Path
 
 from PIL import Image
-from rembg import remove
+
 
 logger = logging.getLogger(__name__)
 
 
 def remove_background(input_path: str | Path) -> bytes:
+    from rembg import remove
     """
     rembg(U2Net)로 제품 이미지 배경을 제거하고 투명 PNG bytes를 반환합니다.
 
