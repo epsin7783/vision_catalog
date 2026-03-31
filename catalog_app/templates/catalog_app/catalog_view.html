@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{ catalog.product_name }} — {{ catalog.company_name }}</title>
+  <meta property="og:title"       content="{{ catalog.product_name }} | {{ catalog.company_name }}" />
+  <meta property="og:description" content="{{ catalog.short_intro }}" />
+  {% if catalog.processed_image %}
+  <meta property="og:image" content="/media/{{ catalog.processed_image }}" />
+  {% endif %}
+
+  <!-- html2pdf.js (integrity 없이 로드) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f4f6f8;
+      color: #111827;
+    }
+
+    /* ── 네비 ─── */
+    .navbar {
+      background: #fff;
+      border-bottom: 1px solid #e5e7eb;
+      padding: 0 24px;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .navbar-brand { font-size: 15px; font-weight: 700; color: #1a1a2e; text-decoration: none; }
+    .navbar-brand span { color: #2563eb; }
+    .navbar-actions { display: flex; gap: 8px; align-items: center; }
+    .btn {
+      padding: 6px 14px;
+      border-radius: 5px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      text-decoration: none;
+      border: 1px solid #d1d5db;
+      background: #fff;
+      color: #374151;
+      transition: background .12s;
+    }
+    .btn:hover { background: #f9fafb; }
+    .btn-primary { background: #2563eb; color: #fff; border-color: #2563eb; }
+    .btn-primary:hover { background: #1d4ed8; }
+
+    /* ── 토스트 ─── */
+    #toast {
+      position: fixed;
+      top: 62px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #1f2937;
+      color: #fff;
+      padding: 8px 16px;
+      border-radius: 5px;
+      font-size: 13px;
+      opacity: 0;
+      pointer-events: none;
+      z-index: 999;
+      transition: opacity .25s;
+      white-space: nowrap;
+    }
+
+    /* ── 컨텐츠 영역 ─── */
+    .page-wrap { max-width: 900px; margin: 0 auto; padding: 28px 20px; }
+
+    /* ── 카탈로그 카드 ─── */
+    #catalogContent {}
+
+    .product-card {
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      overflow: hidden;
+      margin-bottom: 16px;
+      display: grid;
+      grid-template-columns: 280px 1fr;
+    }
+    @media (max-width: 640px) { .product-card { grid-template-columns: 1fr; } }
+
+    /* 체커보드 (투명 배경 시각화) */
+    .product-image-wrap {
+      background-color: #f8fafc;
+      background-image:
+        linear-gradient(45deg, #e5e7eb 25%, transparent 25%),
+        linear-gradient(-45deg, #e5e7eb 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, #e5e7eb 75%),
+        linear-gradient(-45deg, transparent 75%, #e5e7eb 75%);
+      background-size: 14px 14px;
+      background-position: 0 0, 0 7px, 7px -7px, -7px 0px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      min-height: 240px;
+    }
+    .product-image-wrap img {
+      max-height: 220px;
+      max-width: 100%;
+      object-fit: contain;
+    }
+
+    .product-info { padding: 28px 28px 24px; }
+    .company-label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      color: #2563eb;
+      margin-bottom: 8px;
+    }
+    .product-name {
+      font-size: 24px;
+      font-weight: 700;
+      color: #111827;
+      line-height: 1.3;
+      margin-bottom: 10px;
+    }
+    .product-intro {
+      font-size: 14px;
+      color: #4b5563;
+      line-height: 1.6;
+      padding-left: 12px;
+      border-left: 3px solid #2563eb;
+      margin-bottom: 18px;
+    }
+    .meta-row { font-size: 12px; color: #9ca3af; margin-bottom: 18px; }
+    .product-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+    /* ── 스펙 테이블 ─── */
+    .spec-card {
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      overflow: hidden;
+      margin-bottom: 16px;
+    }
+    .spec-card-header {
+      padding: 12px 18px;
+      border-bottom: 1px solid #e5e7eb;
+      font-size: 13px;
+      font-weight: 600;
+      color: #374151;
+      background: #f9fafb;
+    }
+    .spec-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .spec-table tr:nth-child(even) { background: #f9fafb; }
+    .spec-table td { padding: 10px 18px; border-bottom: 1px solid #f3f4f6; }
+    .spec-table tr:last-child td { border-bottom: none; }
+    .spec-key { width: 160px; color: #6b7280; font-weight: 500; }
+    .spec-val { color: #111827; }
+
+    /* ── 연락처 카드 ─── */
+    .contact-card {
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 20px 24px;
+      margin-bottom: 16px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+    .contact-company { font-size: 16px; font-weight: 700; color: #111827; margin-bottom: 4px; }
+    .contact-desc { font-size: 13px; color: #6b7280; }
+    .contact-links { display: flex; gap: 8px; flex-wrap: wrap; }
+    .contact-link {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 14px;
+      border: 1px solid #e5e7eb;
+      border-radius: 5px;
+      font-size: 13px;
+      color: #374151;
+      text-decoration: none;
+      background: #f9fafb;
+    }
+    .contact-link:hover { background: #f3f4f6; }
+
+    /* ── 공유 배너 ─── */
+    .share-bar {
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 16px 20px;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .share-url-label { font-size: 11px; color: #9ca3af; font-weight: 600; text-transform: uppercase; margin-bottom: 2px; }
+    .share-url { font-size: 12px; font-family: monospace; color: #374151; word-break: break-all; }
+    .share-actions { display: flex; gap: 8px; flex-shrink: 0; margin-left: auto; }
+
+    /* ── PDF 전용 숨김 ─── */
+    @media print {
+      .no-print { display: none !important; }
+      body { background: white; }
+    }
+
+    /* ── 문의 모달 ─── */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.45);
+      z-index: 500;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .modal-overlay.show { display: flex; }
+    .modal-box {
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 8px 30px rgba(0,0,0,.15);
+      width: 100%;
+      max-width: 440px;
+    }
+    .modal-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid #e5e7eb;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .modal-title { font-size: 15px; font-weight: 600; color: #111827; }
+    .modal-close { background: none; border: none; font-size: 20px; cursor: pointer; color: #9ca3af; line-height: 1; }
+    .modal-close:hover { color: #374151; }
+    .modal-body { padding: 20px; }
+    .form-group { margin-bottom: 14px; }
+    .form-label { display: block; font-size: 12px; font-weight: 600; color: #374151; margin-bottom: 4px; }
+    .form-label .req { color: #ef4444; }
+    .form-control {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid #d1d5db;
+      border-radius: 5px;
+      font-size: 13px;
+      color: #111827;
+    }
+    .form-control:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 2px rgba(37,99,235,.1); }
+    textarea.form-control { resize: vertical; }
+    .alert-error {
+      background: #fef2f2; border: 1px solid #fecaca; color: #dc2626;
+      border-radius: 5px; padding: 9px 12px; font-size: 13px; margin-bottom: 12px;
+    }
+    .modal-footer { padding: 0 20px 20px; }
+
+    /* 문의 성공 */
+    .modal-success { padding: 36px 20px; text-align: center; display: none; }
+    .modal-success-icon { font-size: 40px; margin-bottom: 12px; }
+    .modal-success-title { font-size: 16px; font-weight: 600; color: #111827; margin-bottom: 6px; }
+    .modal-success-desc { font-size: 13px; color: #6b7280; margin-bottom: 18px; }
+
+    /* 카탈로그 하단 PDF 푸터 */
+    .pdf-footer { text-align: center; padding: 16px; font-size: 11px; color: #9ca3af; }
+  </style>
+</head>
+<body>
+
+  <!-- 네비게이션 -->
+  <nav class="navbar no-print">
+    <a href="/" class="navbar-brand">Vision <span>Catalog</span></a>
+    <div class="navbar-actions">
+      <button onclick="copyLink()" class="btn">링크 복사</button>
+      <button onclick="downloadPDF()" class="btn">PDF 다운로드</button>
+      <button onclick="openInquiry()" class="btn btn-primary">도입/주문 문의</button>
+    </div>
+  </nav>
+
+  <!-- 토스트 -->
+  <div id="toast"></div>
+
+  <div class="page-wrap">
+    <div id="catalogContent">
+
+      <!-- [1] 제품 커버 -->
+      <div class="product-card">
+        <div class="product-image-wrap">
+          {% if catalog.processed_image %}
+            <img src="/media/{{ catalog.processed_image }}" alt="{{ catalog.product_name }}" />
+          {% else %}
+            <img src="/media/{{ catalog.original_image }}" alt="{{ catalog.product_name }}" />
+          {% endif %}
+        </div>
+        <div class="product-info">
+          <p class="company-label">{{ catalog.company_name }}</p>
+          <h1 class="product-name">{{ catalog.product_name }}</h1>
+          <p class="product-intro">{{ catalog.short_intro }}</p>
+          <p class="meta-row">
+            발행일: {{ catalog.created_at|date:"Y년 n월 j일" }} &nbsp;·&nbsp;
+            카탈로그 ID: {{ catalog.id }}
+          </p>
+          <div class="product-actions no-print">
+            <button onclick="openInquiry()" class="btn btn-primary">도입/주문 문의하기</button>
+            <button onclick="downloadPDF()" class="btn">PDF 다운로드</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- [2] 스펙 테이블 -->
+      {% if spec_rows %}
+      <div class="spec-card">
+        <div class="spec-card-header">제품 스펙</div>
+        <table class="spec-table">
+          <tbody>
+            {% for key, val in spec_rows %}
+            <tr>
+              {% if key %}
+                <td class="spec-key">{{ key }}</td>
+                <td class="spec-val">{{ val }}</td>
+              {% else %}
+                <td class="spec-val" colspan="2">{{ val }}</td>
+              {% endif %}
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
+
+      <!-- [3] 회사 연락처 -->
+      <div class="contact-card">
+        <div>
+          <p class="contact-company">{{ catalog.company_name }}</p>
+          <p class="contact-desc">제품 도입 및 주문 문의</p>
+        </div>
+        <div class="contact-links">
+          {% if catalog.contact_email %}
+          <a href="mailto:{{ catalog.contact_email }}" class="contact-link">
+            ✉ {{ catalog.contact_email }}
+          </a>
+          {% endif %}
+          {% if catalog.contact_phone %}
+          <a href="tel:{{ catalog.contact_phone }}" class="contact-link">
+            ☎ {{ catalog.contact_phone }}
+          </a>
+          {% endif %}
+          {% if not catalog.contact_email and not catalog.contact_phone %}
+          <button onclick="openInquiry()" class="btn btn-primary no-print">온라인 문의하기</button>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- 카탈로그 내 푸터 (PDF에 포함) -->
+      <div class="pdf-footer">
+        {{ catalog.company_name }} · {{ catalog.product_name }} · Vision Catalog · {{ catalog.created_at|date:"Y-m-d" }}
+      </div>
+
+    </div><!-- /#catalogContent -->
+
+    <!-- [4] 공유 바 (PDF 미포함) -->
+    <div class="share-bar no-print">
+      <div style="flex:1; min-width:0;">
+        <p class="share-url-label">공유 URL</p>
+        <p class="share-url">{{ catalog_url }}</p>
+      </div>
+      <div class="share-actions">
+        <button onclick="copyLink()" class="btn">링크 복사</button>
+        <a href="/" class="btn btn-primary">+ 새 카탈로그</a>
+      </div>
+    </div>
+
+  </div><!-- /.page-wrap -->
+
+
+  <!-- ── 바이어 문의 모달 ─────────────────────────────────────── -->
+  <div class="modal-overlay no-print" id="inquiryModal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <span class="modal-title">도입/주문 문의</span>
+        <button class="modal-close" onclick="closeInquiry()">×</button>
+      </div>
+
+      <!-- 폼 -->
+      <div id="inquiryForm">
+        <div class="modal-body">
+          <div id="inquiryError" class="alert-error" style="display:none;"></div>
+          <div class="form-group">
+            <label class="form-label">이름 <span class="req">*</span></label>
+            <input id="buyerName" type="text" class="form-control" placeholder="홍길동" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">이메일 <span class="req">*</span></label>
+            <input id="buyerEmail" type="email" class="form-control" placeholder="buyer@company.com" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">연락처</label>
+            <input id="buyerPhone" type="tel" class="form-control" placeholder="010-0000-0000" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">문의 내용 <span class="req">*</span></label>
+            <textarea id="buyerMessage" class="form-control" rows="4"
+              placeholder="도입 수량, 납기, 커스터마이징 요청 등을 적어주세요"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button onclick="sendInquiry()" class="btn btn-primary" style="width:100%; padding:10px;">
+            문의 보내기
+          </button>
+        </div>
+      </div>
+
+      <!-- 성공 -->
+      <div class="modal-success" id="inquirySuccess">
+        <div class="modal-success-icon">✅</div>
+        <p class="modal-success-title">문의가 접수되었습니다</p>
+        <p class="modal-success-desc" id="successMsg"></p>
+        <button onclick="closeInquiry()" class="btn btn-primary" style="padding:8px 24px;">닫기</button>
+      </div>
+    </div>
+  </div>
+
+
+  <script>
+    const CATALOG_ID   = '{{ catalog.id }}';
+    const CATALOG_URL  = '{{ catalog_url }}';
+    const PRODUCT_NAME = '{{ catalog.product_name }}';
+
+    // ── 토스트 ──────────────────────────────────────────────────
+    function showToast(msg, duration = 2500) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.style.opacity = '1';
+      clearTimeout(t._timer);
+      t._timer = setTimeout(() => { t.style.opacity = '0'; }, duration);
+    }
+
+    // ── 링크 복사 ────────────────────────────────────────────────
+    function copyLink() {
+      navigator.clipboard.writeText(CATALOG_URL)
+        .then(() => showToast('링크가 복사되었습니다'))
+        .catch(() => prompt('URL을 복사하세요:', CATALOG_URL));
+    }
+
+    // ── PDF 다운로드 ─────────────────────────────────────────────
+    function downloadPDF() {
+      if (typeof html2pdf === 'undefined') {
+        alert('PDF 라이브러리 로딩 중입니다. 잠시 후 다시 시도해 주세요.');
+        return;
+      }
+
+      const filename = PRODUCT_NAME.replace(/\s+/g, '_') + '_카탈로그.pdf';
+
+      // no-print 요소 JS로 숨김 (html2canvas는 @media print 무시)
+      const noPrint = document.querySelectorAll('.no-print');
+      noPrint.forEach(el => el.style.setProperty('display', 'none', 'important'));
+
+      showToast('PDF 생성 중...', 30000);
+
+      html2pdf()
+        .set({
+          margin:      [10, 10, 10, 10],
+          filename:    filename,
+          image:       { type: 'jpeg', quality: 0.97 },
+          html2canvas: {
+            scale: 2,
+            useCORS: true,
+            allowTaint: true,
+            imageTimeout: 0,
+            backgroundColor: '#ffffff',
+            logging: false,
+          },
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+          pagebreak: { mode: ['avoid-all', 'css'] },
+        })
+        .from(document.getElementById('catalogContent'))
+        .save()
+        .then(() => showToast('PDF 다운로드 완료'))
+        .catch(err => { console.error(err); showToast('PDF 생성 실패 — 콘솔 확인'); })
+        .finally(() => noPrint.forEach(el => el.style.removeProperty('display')));
+    }
+
+    // ── 문의 모달 ────────────────────────────────────────────────
+    function openInquiry() {
+      document.getElementById('inquiryModal').classList.add('show');
+      document.getElementById('inquiryForm').style.display = '';
+      document.getElementById('inquirySuccess').style.display = 'none';
+      document.getElementById('inquiryError').style.display = 'none';
+    }
+    function closeInquiry() {
+      document.getElementById('inquiryModal').classList.remove('show');
+    }
+    document.getElementById('inquiryModal').addEventListener('click', function(e) {
+      if (e.target === this) closeInquiry();
+    });
+
+    async function sendInquiry() {
+      const name    = document.getElementById('buyerName').value.trim();
+      const email   = document.getElementById('buyerEmail').value.trim();
+      const phone   = document.getElementById('buyerPhone').value.trim();
+      const message = document.getElementById('buyerMessage').value.trim();
+      const errEl   = document.getElementById('inquiryError');
+
+      if (!name || !email || !message) {
+        errEl.textContent = '이름, 이메일, 문의 내용은 필수입니다.';
+        errEl.style.display = '';
+        return;
+      }
+      errEl.style.display = 'none';
+
+      try {
+        const res = await fetch(`/catalog/${CATALOG_ID}/inquire/`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ buyer_name: name, buyer_email: email,
+                                 buyer_phone: phone, message }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          document.getElementById('inquiryForm').style.display = 'none';
+          document.getElementById('successMsg').textContent = data.message;
+          document.getElementById('inquirySuccess').style.display = '';
+        } else {
+          errEl.textContent = data.error || '오류가 발생했습니다.';
+          errEl.style.display = '';
+        }
+      } catch {
+        errEl.textContent = '서버 연결에 실패했습니다.';
+        errEl.style.display = '';
+      }
+    }
+  </script>
+</body>
+</html>

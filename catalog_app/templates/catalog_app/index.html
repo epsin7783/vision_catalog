@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Vision Catalog — B2B e카탈로그 자동 생성</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f4f6f8;
+      color: #111827;
+      min-height: 100vh;
+    }
+
+    /* ── 네비 ─── */
+    .navbar {
+      background: #fff;
+      border-bottom: 1px solid #e5e7eb;
+      padding: 0 24px;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .navbar-brand { font-size: 15px; font-weight: 700; color: #1a1a2e; text-decoration: none; }
+    .navbar-brand span { color: #2563eb; }
+    .navbar-right { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+    .navbar-user { color: #6b7280; }
+    .navbar-user strong { color: #111827; }
+    .btn-sm {
+      padding: 5px 12px;
+      border: 1px solid #d1d5db;
+      border-radius: 5px;
+      background: #fff;
+      color: #374151;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background .12s;
+    }
+    .btn-sm:hover { background: #f9fafb; }
+    .btn-sm-primary {
+      background: #2563eb;
+      color: #fff;
+      border-color: #2563eb;
+    }
+    .btn-sm-primary:hover { background: #1d4ed8; }
+
+    /* ── 레이아웃 ─── */
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 32px 20px;
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      gap: 24px;
+      align-items: start;
+    }
+    @media (max-width: 768px) { .container { grid-template-columns: 1fr; } }
+
+    /* ── 카드 ─── */
+    .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; }
+    .card-header {
+      padding: 13px 20px;
+      border-bottom: 1px solid #e5e7eb;
+      font-size: 13px;
+      font-weight: 600;
+      color: #374151;
+      background: #f9fafb;
+    }
+    .form-body { padding: 20px; }
+
+    /* ── 폼 요소 ─── */
+    .form-group { margin-bottom: 14px; }
+    .form-label { display: block; font-size: 12px; font-weight: 600; color: #374151; margin-bottom: 4px; }
+    .form-label .req { color: #ef4444; margin-left: 2px; }
+    .form-label .opt { color: #9ca3af; font-weight: 400; margin-left: 4px; }
+    .form-control {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid #d1d5db;
+      border-radius: 5px;
+      font-size: 13px;
+      color: #111827;
+      background: #fff;
+      transition: border-color .12s;
+    }
+    .form-control:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 2px rgba(37,99,235,.1); }
+    textarea.form-control { resize: vertical; font-family: monospace; font-size: 12px; line-height: 1.6; }
+    .form-hint { font-size: 11px; color: #9ca3af; margin-top: 3px; }
+    .form-divider { border: none; border-top: 1px solid #f3f4f6; margin: 16px 0; }
+    .section-label { font-size: 11px; font-weight: 700; text-transform: uppercase; color: #9ca3af; letter-spacing: .5px; margin-bottom: 12px; }
+
+    /* ── 이미지 업로드 ─── */
+    .upload-zone {
+      border: 1.5px dashed #d1d5db;
+      border-radius: 6px;
+      padding: 20px;
+      text-align: center;
+      cursor: pointer;
+      background: #fafafa;
+      transition: border-color .15s, background .15s;
+    }
+    .upload-zone:hover, .upload-zone.dragover { border-color: #2563eb; background: #eff6ff; }
+    .upload-icon { font-size: 26px; margin-bottom: 6px; }
+    .upload-text { font-size: 13px; color: #374151; font-weight: 500; }
+    .upload-hint { font-size: 11px; color: #9ca3af; margin-top: 3px; }
+    .upload-preview { display: none; flex-direction: column; align-items: center; gap: 6px; }
+    .upload-preview img { max-height: 110px; border-radius: 4px; object-fit: contain; border: 1px solid #e5e7eb; }
+    .upload-preview-name { font-size: 11px; color: #6b7280; }
+    .upload-preview-change { font-size: 11px; color: #2563eb; }
+
+    /* ── 에러 배너 ─── */
+    .alert-error {
+      background: #fef2f2; border: 1px solid #fecaca; color: #dc2626;
+      border-radius: 5px; padding: 9px 12px; font-size: 13px; margin-bottom: 14px;
+    }
+
+    /* ── 제출 버튼 ─── */
+    .btn-primary {
+      width: 100%;
+      padding: 10px;
+      background: #2563eb;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .12s;
+      margin-top: 4px;
+    }
+    .btn-primary:hover { background: #1d4ed8; }
+    .btn-primary:disabled { background: #93c5fd; cursor: not-allowed; }
+
+    /* ── 통계 + 목록 ─── */
+    .stats-bar {
+      display: flex;
+      gap: 1px;
+      background: #e5e7eb;
+      border-radius: 8px;
+      overflow: hidden;
+      margin-bottom: 20px;
+    }
+    .stat-item { flex: 1; background: #fff; padding: 16px 20px; text-align: center; }
+    .stat-num { font-size: 24px; font-weight: 700; color: #111827; }
+    .stat-lbl { font-size: 12px; color: #6b7280; margin-top: 2px; }
+
+    .catalog-table { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; }
+    .catalog-table-header {
+      padding: 12px 18px;
+      border-bottom: 1px solid #e5e7eb;
+      font-size: 13px;
+      font-weight: 600;
+      color: #374151;
+      background: #f9fafb;
+    }
+    .catalog-table table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .catalog-table th {
+      padding: 9px 14px;
+      background: #f9fafb;
+      border-bottom: 1px solid #e5e7eb;
+      color: #6b7280;
+      font-weight: 600;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .4px;
+      text-align: left;
+    }
+    .catalog-table td {
+      padding: 10px 14px;
+      border-bottom: 1px solid #f3f4f6;
+      color: #374151;
+      vertical-align: middle;
+    }
+    .catalog-table tr:last-child td { border-bottom: none; }
+    .catalog-table tr:hover td { background: #f9fafb; }
+    .thumb {
+      width: 38px; height: 38px;
+      border-radius: 4px; object-fit: contain;
+      border: 1px solid #e5e7eb; background: #f8fafc;
+    }
+    .catalog-name a { color: #111827; text-decoration: none; font-weight: 500; }
+    .catalog-name a:hover { color: #2563eb; }
+    .catalog-company { color: #6b7280; font-size: 12px; }
+    .badge {
+      display: inline-block; padding: 2px 8px;
+      border-radius: 3px; font-size: 11px; font-weight: 600;
+      background: #eff6ff; color: #1d4ed8;
+      text-decoration: none;
+    }
+    .badge:hover { background: #dbeafe; }
+    .empty-state { text-align: center; padding: 40px 20px; color: #9ca3af; }
+    .empty-state-icon { font-size: 32px; margin-bottom: 8px; }
+    .empty-state-text { font-size: 13px; line-height: 1.6; }
+
+    /* 비로그인 안내 패널 */
+    .guest-panel {
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 32px 24px;
+      text-align: center;
+    }
+    .guest-panel-icon { font-size: 36px; margin-bottom: 12px; }
+    .guest-panel-title { font-size: 16px; font-weight: 600; color: #111827; margin-bottom: 6px; }
+    .guest-panel-desc { font-size: 13px; color: #6b7280; line-height: 1.6; margin-bottom: 20px; }
+    .guest-panel-actions { display: flex; gap: 8px; justify-content: center; }
+
+    /* ── 로딩 오버레이 ─── */
+    .overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.45); z-index: 999;
+      align-items: center; justify-content: center;
+    }
+    .overlay.show { display: flex; }
+    .overlay-box {
+      background: #fff; border-radius: 8px; padding: 36px 40px;
+      text-align: center; box-shadow: 0 8px 30px rgba(0,0,0,.15);
+      max-width: 300px; width: 100%;
+    }
+    .spinner {
+      width: 38px; height: 38px;
+      border: 3px solid #e5e7eb; border-top-color: #2563eb;
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      margin: 0 auto 14px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .overlay-title { font-size: 15px; font-weight: 600; color: #111827; margin-bottom: 6px; }
+    .overlay-desc { font-size: 13px; color: #6b7280; }
+
+    /* ══ 로그인/회원가입 모달 ═══════════════════════════════════ */
+    .auth-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.45); z-index: 998;
+      align-items: center; justify-content: center; padding: 16px;
+    }
+    .auth-overlay.show { display: flex; }
+    .auth-box {
+      background: #fff; border-radius: 8px;
+      box-shadow: 0 8px 30px rgba(0,0,0,.15);
+      width: 100%; max-width: 400px;
+    }
+    .auth-tabs {
+      display: flex; border-bottom: 1px solid #e5e7eb;
+    }
+    .auth-tab {
+      flex: 1; padding: 13px;
+      background: none; border: none; cursor: pointer;
+      font-size: 13px; font-weight: 600; color: #9ca3af;
+      border-bottom: 2px solid transparent; margin-bottom: -1px;
+      transition: color .12s;
+    }
+    .auth-tab.active { color: #2563eb; border-bottom-color: #2563eb; }
+    .auth-notice {
+      padding: 12px 20px;
+      background: #fffbeb;
+      border-bottom: 1px solid #fde68a;
+      font-size: 12px;
+      color: #92400e;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .auth-body { padding: 20px; }
+    .auth-label { display: block; font-size: 12px; font-weight: 600; color: #374151; margin-bottom: 4px; }
+    .auth-input {
+      width: 100%; padding: 8px 10px;
+      border: 1px solid #d1d5db; border-radius: 5px;
+      font-size: 13px; color: #111827;
+      margin-bottom: 13px; transition: border-color .12s;
+    }
+    .auth-input:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 2px rgba(37,99,235,.1); }
+    .auth-btn {
+      width: 100%; padding: 10px;
+      background: #2563eb; color: #fff; border: none;
+      border-radius: 6px; font-size: 14px; font-weight: 600;
+      cursor: pointer; transition: background .12s;
+    }
+    .auth-btn:hover { background: #1d4ed8; }
+    .auth-error {
+      background: #fef2f2; border: 1px solid #fecaca; color: #dc2626;
+      border-radius: 5px; padding: 8px 11px; font-size: 12px; margin-bottom: 12px;
+      display: none;
+    }
+    .auth-close-row { padding: 14px 20px 14px; text-align: center; border-top: 1px solid #f3f4f6; }
+    .auth-close-btn {
+      background: none; border: none; color: #9ca3af;
+      font-size: 12px; cursor: pointer;
+    }
+    .auth-close-btn:hover { color: #374151; }
+  </style>
+</head>
+<body>
+
+  <!-- ── 네비게이션 ──────────────────────────────────────── -->
+  <nav class="navbar">
+    <a href="/" class="navbar-brand">Vision <span>Catalog</span></a>
+    <div class="navbar-right">
+      {% if request.user.is_authenticated %}
+        <span class="navbar-user"><strong>{{ request.user.username }}</strong> 님</span>
+        <a href="{% url 'catalog:logout' %}" class="btn-sm">로그아웃</a>
+      {% else %}
+        <a href="{% url 'catalog:login' %}" class="btn-sm">로그인</a>
+        <a href="{% url 'catalog:signup' %}" class="btn-sm btn-sm-primary">회원가입</a>
+      {% endif %}
+    </div>
+  </nav>
+
+  <div class="container">
+
+    <!-- ── 왼쪽: 카탈로그 생성 폼 ─── -->
+    <aside>
+      <div class="card">
+        <div class="card-header">새 카탈로그 만들기</div>
+        <div class="form-body">
+
+          {% if error %}
+          <div class="alert-error">{{ error }}</div>
+          {% endif %}
+
+          <form id="catalogForm" method="post" action="{% url 'catalog:create' %}" enctype="multipart/form-data">
+            {% csrf_token %}
+
+            <p class="section-label">제품 정보</p>
+
+            <div class="form-group">
+              <label class="form-label">제품명 <span class="req">*</span></label>
+              <input type="text" name="product_name" class="form-control"
+                     value="{{ form_data.product_name|default:'' }}"
+                     placeholder="예: 산업용 IoT 온도 센서" required />
+            </div>
+            <div class="form-group">
+              <label class="form-label">한 줄 소개 <span class="req">*</span></label>
+              <input type="text" name="short_intro" class="form-control"
+                     value="{{ form_data.short_intro|default:'' }}"
+                     placeholder="제품의 핵심 가치를 한 문장으로" required />
+            </div>
+            <div class="form-group">
+              <label class="form-label">스펙 <span class="opt">(선택)</span></label>
+              <textarea name="specs" class="form-control" rows="5"
+                placeholder="크기: 80 x 40 x 25 mm&#10;무게: 120g&#10;방수 등급: IP67">{{ form_data.specs|default:'' }}</textarea>
+              <p class="form-hint">키: 값 형식으로 줄마다 입력</p>
+            </div>
+
+            <hr class="form-divider" />
+            <p class="section-label">회사 / 연락처</p>
+
+            <div class="form-group">
+              <label class="form-label">회사명 <span class="req">*</span></label>
+              <input type="text" name="company_name" class="form-control"
+                     value="{{ form_data.company_name|default:'' }}"
+                     placeholder="예: (주)스마트센서코리아" required />
+            </div>
+            <div class="form-group">
+              <label class="form-label">문의 이메일 <span class="opt">(선택)</span></label>
+              <input type="email" name="contact_email" class="form-control"
+                     value="{{ form_data.contact_email|default:'' }}"
+                     placeholder="sales@company.com" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">문의 전화 <span class="opt">(선택)</span></label>
+              <input type="tel" name="contact_phone" class="form-control"
+                     value="{{ form_data.contact_phone|default:'' }}"
+                     placeholder="02-1234-5678" />
+            </div>
+
+            <hr class="form-divider" />
+            <p class="section-label">제품 이미지</p>
+
+            <div class="form-group">
+              <div class="upload-zone" id="dropZone"
+                   onclick="document.getElementById('imageInput').click()">
+                <div id="dropPlaceholder">
+                  <div class="upload-icon">📷</div>
+                  <p class="upload-text">클릭하거나 파일을 드래그하세요</p>
+                  <p class="upload-hint">JPG · PNG · WEBP · 최대 20MB · AI 배경 제거 적용</p>
+                </div>
+                <div class="upload-preview" id="dropPreview">
+                  <img id="previewImg" src="" alt="" />
+                  <span class="upload-preview-name" id="previewName"></span>
+                  <span class="upload-preview-change">다시 클릭하면 교체</span>
+                </div>
+                <input type="file" id="imageInput" name="image"
+                       accept=".jpg,.jpeg,.png,.webp,.bmp"
+                       style="display:none" required />
+              </div>
+            </div>
+
+            <button type="submit" id="submitBtn" class="btn-primary">
+              카탈로그 생성
+            </button>
+          </form>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ── 오른쪽: 대시보드 or 비로그인 안내 ─── -->
+    <section>
+      {% if request.user.is_authenticated %}
+        <!-- 통계 -->
+        <div class="stats-bar">
+          <div class="stat-item">
+            <div class="stat-num">{{ my_catalogs|length }}</div>
+            <div class="stat-lbl">내 카탈로그</div>
+          </div>
+        </div>
+
+        <!-- 목록 -->
+        <div class="catalog-table">
+          <div class="catalog-table-header">내 카탈로그</div>
+          {% if my_catalogs %}
+          <table>
+            <thead>
+              <tr>
+                <th style="width:46px"></th>
+                <th>제품 / 회사</th>
+                <th>생성일</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in my_catalogs %}
+              <tr>
+                <td>
+                  {% if item.processed_image %}
+                    <img class="thumb" src="/media/{{ item.processed_image }}" alt="" />
+                  {% else %}
+                    <img class="thumb" src="/media/{{ item.original_image }}" alt="" />
+                  {% endif %}
+                </td>
+                <td>
+                  <div class="catalog-name">
+                    <a href="{% url 'catalog:view' item.id %}">{{ item.product_name }}</a>
+                  </div>
+                  <div class="catalog-company">{{ item.company_name }}</div>
+                </td>
+                <td style="white-space:nowrap; color:#6b7280; font-size:12px;">
+                  {{ item.created_at|date:"Y-m-d" }}
+                </td>
+                <td>
+                  <a href="{% url 'catalog:view' item.id %}" class="badge" target="_blank">보기</a>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% else %}
+          <div class="empty-state">
+            <div class="empty-state-icon">📋</div>
+            <p class="empty-state-text">아직 생성된 카탈로그가 없습니다.<br>왼쪽 폼에서 첫 카탈로그를 만들어 보세요.</p>
+          </div>
+          {% endif %}
+        </div>
+
+      {% else %}
+        <!-- 비로그인 안내 -->
+        <div class="guest-panel">
+          <div class="guest-panel-icon">📂</div>
+          <h2 class="guest-panel-title">내 카탈로그를 관리하려면 로그인하세요</h2>
+          <p class="guest-panel-desc">
+            로그인 없이도 왼쪽 폼을 작성할 수 있습니다.<br>
+            카탈로그 생성 버튼을 누르면 로그인 화면이 나타납니다.
+          </p>
+          <div class="guest-panel-actions">
+            <a href="{% url 'catalog:login' %}" class="btn-sm">로그인</a>
+            <a href="{% url 'catalog:signup' %}" class="btn-sm btn-sm-primary">회원가입</a>
+          </div>
+        </div>
+      {% endif %}
+    </section>
+  </div>
+
+
+  <!-- ── 로딩 오버레이 ─────────────────────────────────── -->
+  <div class="overlay" id="loadingOverlay">
+    <div class="overlay-box">
+      <div class="spinner"></div>
+      <p class="overlay-title">카탈로그 생성 중...</p>
+      <p class="overlay-desc">AI 배경 제거가 진행 중입니다.<br>잠시만 기다려 주세요.</p>
+    </div>
+  </div>
+
+
+  <!-- ══ 로그인/회원가입 모달 ════════════════════════════ -->
+  <div class="auth-overlay" id="authModal">
+    <div class="auth-box">
+
+      <!-- 탭 -->
+      <div class="auth-tabs">
+        <button class="auth-tab active" id="tabLogin" onclick="switchTab('login')">로그인</button>
+        <button class="auth-tab"        id="tabSignup" onclick="switchTab('signup')">회원가입</button>
+      </div>
+
+      <!-- 안내 문구 -->
+      <div class="auth-notice">
+        ⚠️ 카탈로그를 저장하고 관리하려면 로그인이 필요합니다.
+      </div>
+
+      <!-- 로그인 패널 -->
+      <div id="panelLogin">
+        <div class="auth-body">
+          <div class="auth-error" id="loginError"></div>
+          <label class="auth-label">아이디</label>
+          <input type="text" id="loginUsername" class="auth-input" placeholder="아이디 입력" />
+          <label class="auth-label">비밀번호</label>
+          <input type="password" id="loginPassword" class="auth-input" placeholder="비밀번호 입력"
+                 onkeydown="if(event.key==='Enter') doLogin()" />
+          <button class="auth-btn" onclick="doLogin()">로그인 후 카탈로그 생성</button>
+        </div>
+      </div>
+
+      <!-- 회원가입 패널 -->
+      <div id="panelSignup" style="display:none;">
+        <div class="auth-body">
+          <div class="auth-error" id="signupError"></div>
+          <label class="auth-label">아이디</label>
+          <input type="text" id="signupUsername" class="auth-input" placeholder="사용할 아이디" />
+          <label class="auth-label">이메일 <span style="color:#9ca3af; font-weight:400;">(선택)</span></label>
+          <input type="email" id="signupEmail" class="auth-input" placeholder="example@company.com" />
+          <label class="auth-label">비밀번호 <span style="color:#9ca3af; font-weight:400;">(8자 이상)</span></label>
+          <input type="password" id="signupPw1" class="auth-input" placeholder="비밀번호 설정" />
+          <label class="auth-label">비밀번호 확인</label>
+          <input type="password" id="signupPw2" class="auth-input" placeholder="비밀번호 재입력"
+                 onkeydown="if(event.key==='Enter') doSignup()" />
+          <button class="auth-btn" onclick="doSignup()">회원가입 후 카탈로그 생성</button>
+        </div>
+      </div>
+
+      <div class="auth-close-row">
+        <button class="auth-close-btn" onclick="closeAuthModal()">닫기</button>
+      </div>
+    </div>
+  </div>
+
+
+  <script>
+    const IS_AUTH = {{ request.user.is_authenticated|yesno:"true,false" }};
+
+    // ── 이미지 업로드 ──────────────────────────────────────────
+    const dropZone    = document.getElementById('dropZone');
+    const imageInput  = document.getElementById('imageInput');
+    const placeholder = document.getElementById('dropPlaceholder');
+    const preview     = document.getElementById('dropPreview');
+    const previewImg  = document.getElementById('previewImg');
+    const previewName = document.getElementById('previewName');
+
+    dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+    dropZone.addEventListener('drop', e => {
+      e.preventDefault();
+      dropZone.classList.remove('dragover');
+      const file = e.dataTransfer.files[0];
+      if (file) { imageInput.files = e.dataTransfer.files; showPreview(file); }
+    });
+    imageInput.addEventListener('change', e => {
+      if (e.target.files[0]) showPreview(e.target.files[0]);
+    });
+
+    function showPreview(file) {
+      const reader = new FileReader();
+      reader.onload = e => {
+        previewImg.src = e.target.result;
+        previewName.textContent = file.name;
+        placeholder.style.display = 'none';
+        preview.style.display = 'flex';
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // ── 폼 제출 가로채기 ──────────────────────────────────────
+    document.getElementById('catalogForm').addEventListener('submit', function(e) {
+      if (!IS_AUTH) {
+        e.preventDefault();           // 제출 막기
+        openAuthModal();              // 로그인 모달 표시
+        return;
+      }
+      // 로그인 상태면 정상 제출
+      document.getElementById('loadingOverlay').classList.add('show');
+      document.getElementById('submitBtn').disabled = true;
+    });
+
+    // ── 로그인/회원가입 모달 ──────────────────────────────────
+    function openAuthModal() {
+      document.getElementById('authModal').classList.add('show');
+      document.getElementById('loginUsername').focus();
+    }
+    function closeAuthModal() {
+      document.getElementById('authModal').classList.remove('show');
+    }
+    document.getElementById('authModal').addEventListener('click', function(e) {
+      if (e.target === this) closeAuthModal();
+    });
+
+    function switchTab(tab) {
+      const isLogin = tab === 'login';
+      document.getElementById('tabLogin').classList.toggle('active', isLogin);
+      document.getElementById('tabSignup').classList.toggle('active', !isLogin);
+      document.getElementById('panelLogin').style.display  = isLogin ? '' : 'none';
+      document.getElementById('panelSignup').style.display = isLogin ? 'none' : '';
+    }
+
+    // ── AJAX 로그인 → 성공 시 폼 제출 ─────────────────────────
+    async function doLogin() {
+      const username = document.getElementById('loginUsername').value.trim();
+      const password = document.getElementById('loginPassword').value;
+      const errEl    = document.getElementById('loginError');
+
+      if (!username || !password) {
+        showAuthError(errEl, '아이디와 비밀번호를 입력해 주세요.');
+        return;
+      }
+
+      const res  = await authFetch('/auth/login/', { username, password });
+      const data = await res.json();
+      if (data.success) {
+        closeAuthModal();
+        // 세션 쿠키가 세팅됐으므로 폼을 그대로 제출
+        document.getElementById('loadingOverlay').classList.add('show');
+        document.getElementById('submitBtn').disabled = true;
+        document.getElementById('catalogForm').submit();
+      } else {
+        showAuthError(errEl, data.error || '로그인에 실패했습니다.');
+      }
+    }
+
+    // ── AJAX 회원가입 → 성공 시 폼 제출 ──────────────────────
+    async function doSignup() {
+      const username  = document.getElementById('signupUsername').value.trim();
+      const email     = document.getElementById('signupEmail').value.trim();
+      const password1 = document.getElementById('signupPw1').value;
+      const password2 = document.getElementById('signupPw2').value;
+      const errEl     = document.getElementById('signupError');
+
+      const res  = await authFetch('/auth/signup/', { username, email, password1, password2 });
+      const data = await res.json();
+      if (data.success) {
+        closeAuthModal();
+        document.getElementById('loadingOverlay').classList.add('show');
+        document.getElementById('submitBtn').disabled = true;
+        document.getElementById('catalogForm').submit();
+      } else {
+        showAuthError(errEl, data.error || '회원가입에 실패했습니다.');
+      }
+    }
+
+    function authFetch(url, body) {
+      return fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+    }
+
+    function showAuthError(el, msg) {
+      el.textContent = msg;
+      el.style.display = '';
+    }
+  </script>
+</body>
+</html>

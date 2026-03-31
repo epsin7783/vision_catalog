@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>로그인 — Vision Catalog</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f4f6f8;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .card {
+      background: #fff;
+      border: 1px solid #dde1e7;
+      border-radius: 8px;
+      padding: 40px 36px;
+      width: 100%;
+      max-width: 400px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.07);
+    }
+    .logo {
+      font-size: 20px;
+      font-weight: 700;
+      color: #1a1a2e;
+      text-align: center;
+      margin-bottom: 6px;
+    }
+    .logo span { color: #2563eb; }
+    .subtitle {
+      text-align: center;
+      color: #6b7280;
+      font-size: 13px;
+      margin-bottom: 28px;
+    }
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: #374151;
+      margin-bottom: 5px;
+    }
+    input[type="text"], input[type="password"], input[type="email"] {
+      width: 100%;
+      padding: 9px 12px;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      font-size: 14px;
+      color: #111827;
+      background: #fff;
+      transition: border-color .15s;
+      margin-bottom: 16px;
+    }
+    input:focus {
+      outline: none;
+      border-color: #2563eb;
+      box-shadow: 0 0 0 3px rgba(37,99,235,.1);
+    }
+    .btn {
+      width: 100%;
+      padding: 10px;
+      background: #2563eb;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .15s;
+      margin-top: 4px;
+    }
+    .btn:hover { background: #1d4ed8; }
+    .error-box {
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      color: #dc2626;
+      border-radius: 6px;
+      padding: 10px 12px;
+      font-size: 13px;
+      margin-bottom: 16px;
+    }
+    .divider {
+      text-align: center;
+      color: #9ca3af;
+      font-size: 12px;
+      margin: 20px 0;
+      position: relative;
+    }
+    .divider::before, .divider::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      width: 42%;
+      height: 1px;
+      background: #e5e7eb;
+    }
+    .divider::before { left: 0; }
+    .divider::after  { right: 0; }
+    .link-row {
+      text-align: center;
+      font-size: 13px;
+      color: #6b7280;
+    }
+    .link-row a {
+      color: #2563eb;
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .link-row a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">Vision <span>Catalog</span></div>
+    <p class="subtitle">B2B e카탈로그 자동 생성 플랫폼</p>
+
+    {% if error %}
+    <div class="error-box">{{ error }}</div>
+    {% endif %}
+
+    <form method="post" action="{% url 'catalog:login' %}{% if request.GET.next %}?next={{ request.GET.next }}{% endif %}">
+      {% csrf_token %}
+      <label for="username">아이디</label>
+      <input type="text" id="username" name="username"
+             value="{{ username|default:'' }}" placeholder="아이디 입력" required autofocus />
+
+      <label for="password">비밀번호</label>
+      <input type="password" id="password" name="password"
+             placeholder="비밀번호 입력" required />
+
+      <button type="submit" class="btn">로그인</button>
+    </form>
+
+    <div class="divider">또는</div>
+    <div class="link-row">
+      계정이 없으신가요? <a href="{% url 'catalog:signup' %}">회원가입</a>
+    </div>
+  </div>
+</body>
+</html>
