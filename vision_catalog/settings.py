@@ -7,7 +7,7 @@ SECRET_KEY = 'django-insecure-vision-catalog-demo-key-change-in-production'
 
 DEBUG = True
 
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = ["localhost", "127.0.0.1","snapcatalog.kr", "www.snapcatalog.kr", "118.219.233.175"]
 
 INSTALLED_APPS = [
     'django.contrib.contenttypes',
